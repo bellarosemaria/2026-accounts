@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Datadog Sales Intelligence Dashboard</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f5f6fa;color:#23233e}
+.header{background:linear-gradient(135deg,#632CA6,#7B4FBF);color:#fff;padding:20px 32px;display:flex;align-items:center;justify-content:space-between;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,.15)}
+.header h1{font-size:22px;font-weight:700;letter-spacing:-.5px}
+.header .subtitle{font-size:13px;opacity:.8;margin-top:2px}
+.header .meta{text-align:right;font-size:12px;opacity:.7}
+.controls{background:#fff;padding:14px 32px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;border-bottom:1px solid #e4e7ed}
+.controls input[type=text]{padding:8px 14px;border:1px solid #d1d5db;border-radius:6px;font-size:14px;width:300px;outline:none;transition:border .2s}
+.controls input[type=text]:focus{border-color:#632CA6}
+.controls select{padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:14px;outline:none;background:#fff;cursor:pointer}
+.stats{display:flex;gap:8px;margin-left:auto;font-size:13px;color:#6b7280}
+.stats .badge{padding:3px 10px;border-radius:12px;font-weight:600;font-size:12px}
+.badge-high{background:#dcfce7;color:#166534}.badge-medhigh{background:#d1fae5;color:#065f46}.badge-med{background:#fef9c3;color:#854d0e}.badge-lowmed{background:#ffe4cc;color:#9a3412}.badge-low{background:#fee2e2;color:#991b1b}
+.flag-new{background:#632CA6;color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;margin-left:6px;letter-spacing:.5px;animation:pulse 2s infinite}
+.flag-updated{background:#2563eb;color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;margin-left:6px;letter-spacing:.5px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.7}}
+tr.is-new{border-left:3px solid #632CA6}
+tr.is-updated{border-left:3px solid #2563eb}
+.new-trigger-item{color:#2563eb;font-weight:600}
+.container{padding:16px 32px 60px}
+table{width:100%;border-collapse:separate;border-spacing:0;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 6px rgba(0,0,0,.06)}
+thead th{background:#23233e;color:#fff;padding:11px 14px;text-align:left;font-size:13px;font-weight:600;cursor:pointer;user-select:none;white-space:nowrap}
+thead th:hover{background:#35355a}
+thead th .arrow{margin-left:4px;font-size:10px;opacity:.6}
+tbody tr{cursor:pointer;transition:background .15s}
+tbody tr:hover{background:#f3f0ff}
+tbody tr.expanded{background:#ede9fe}
+tbody td{padding:10px 14px;font-size:13px;border-bottom:1px solid #f0f0f0;vertical-align:top;line-height:1.5}
+.priority-cell{font-weight:700;font-size:12px;border-radius:6px;text-align:center;padding:5px 10px;display:inline-block;min-width:80px}
+.p-High{background:#dcfce7;color:#166534}.p-Medium-High{background:#d1fae5;color:#065f46}.p-Medium{background:#fef9c3;color:#854d0e}.p-Low-Medium{background:#ffe4cc;color:#9a3412}.p-Low{background:#fee2e2;color:#991b1b}
+.detail-row{display:none}
+.detail-row.visible{display:table-row}
+.detail-row td{padding:0;border-bottom:2px solid #632CA6}
+.detail-panel{padding:20px 24px;background:#faf9ff;animation:slideDown .2s ease}
+@keyframes slideDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.detail-section{background:#fff;border-radius:8px;padding:14px 16px;border:1px solid #e8e5f0}
+.detail-section h4{font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#632CA6;margin-bottom:8px;font-weight:700}
+.detail-section p,.detail-section li{font-size:13px;line-height:1.6;color:#374151}
+.detail-section ul{padding-left:16px}
+.contacts-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.contact-card{background:#fff;border:1px solid #e8e5f0;border-radius:8px;padding:12px}
+.contact-card .title{font-weight:700;font-size:13px;color:#23233e;margin-bottom:4px}
+.contact-card .rationale{font-size:12px;color:#6b7280;line-height:1.5}
+.full-width{grid-column:1/-1}
+.website-link{color:#632CA6;text-decoration:none;font-weight:500}
+.website-link:hover{text-decoration:underline}
+.expand-icon{display:inline-block;width:18px;font-size:11px;color:#9ca3af;transition:transform .2s}
+.expanded .expand-icon{transform:rotate(90deg);color:#632CA6}
+.truncate{max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.product-tags{display:flex;flex-wrap:wrap;gap:4px}
+.product-tag{background:#ede9fe;color:#5b21b6;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:500;white-space:nowrap}
+@media(max-width:1200px){.controls input[type=text]{width:200px}.detail-grid{grid-template-columns:1fr}.contacts-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="header">
+  <div><h1>Datadog Sales Intelligence Dashboard</h1><div class="subtitle">Territory Research &bull; <span id="accountCount">93</span> Accounts</div></div>
+  <div class="meta">Last updated: March 30, 2026<br>Data source: Web research + analysis</div>
+</div>
+<div class="controls">
+  <input type="text" id="search" placeholder="Search companies, industries, triggers...">
+  <select id="priorityFilter">
+    <option value="">All Priorities</option>
+    <option value="High">High</option>
+    <option value="Medium-High">Medium-High</option>
+    <option value="Medium">Medium</option>
+    <option value="Low-Medium">Low-Medium</option>
+    <option value="Low">Low</option>
+  </select>
+  <select id="statusFilter">
+    <option value="">All Accounts</option>
+    <option value="new">New Accounts</option>
+    <option value="updated">Updated</option>
+    <option value="new+updated">New + Updated</option>
+  </select>
+  <select id="sortBy">
+    <option value="priority">Sort: Priority</option>
+    <option value="name">Sort: Company A-Z</option>
+    <option value="industry">Sort: Industry</option>
+  </select>
+  <div class="stats" id="stats"></div>
+</div>
+<div class="container">
+  <table><thead><tr>
+    <th style="width:30px"></th>
+    <th>Company</th>
+    <th>Industry</th>
+    <th>Priority</th>
+    <th>Datadog Products</th>
+    <th>Key Outreach Trigger</th>
+    <th>Top Contact</th>
+  </tr></thead><tbody id="tbody"></tbody></table>
+</div>
+<script src="data.js?v=20260330a"></script>
+<script>
+const priorityOrder={High:0,'Medium-High':1,Medium:2,'Low-Medium':3,Low:4};
+let expanded=new Set();
+
+function renderProducts(str){
+  return str.split(',').map(p=>`<span class="product-tag">${p.trim()}</span>`).join('');
+}
+
+function renderTable(data){
+  const tb=document.getElementById('tbody');
+  tb.innerHTML='';
+  data.forEach(c=>{
+    const isExp=expanded.has(c.id);
+    const tr=document.createElement('tr');
+    tr.className=isExp?'expanded':'';
+    const flag=c.isNew?'<span class="flag-new">NEW</span>':c.isUpdated?'<span class="flag-updated">UPDATED</span>':'';
+    if(c.isNew)tr.classList.add('is-new');
+    if(c.isUpdated)tr.classList.add('is-updated');
+    tr.innerHTML=`
+      <td><span class="expand-icon">\u25B6</span></td>
+      <td><strong>${c.name}</strong>${flag}<br><a href="https://${c.website}" target="_blank" class="website-link">${c.website}</a></td>
+      <td>${c.industry}</td>
+      <td><span class="priority-cell p-${c.priority.replace(/\s/g,'-')}">${c.priority}</span></td>
+      <td><div class="product-tags">${renderProducts(c.products)}</div></td>
+      <td class="truncate" title="${c.triggers.replace(/"/g,'&quot;')}">${c.triggers.split(';')[0]}</td>
+      <td>${c.contacts[0].title}</td>`;
+    tr.onclick=()=>toggle(c.id);
+    tb.appendChild(tr);
+
+    const dr=document.createElement('tr');
+    dr.className='detail-row'+(isExp?' visible':'');
+    dr.id='detail-'+c.id;
+    dr.innerHTML=`<td colspan="7"><div class="detail-panel">
+      <div class="contacts-grid" style="margin-bottom:18px">
+        ${c.contacts.map(ct=>`<div class="contact-card"><div class="title">${ct.title}</div><div class="rationale">${ct.rationale}</div></div>`).join('')}
+      </div>
+      <div class="detail-grid">
+        <div class="detail-section full-width"><h4>Datadog Fit Hypothesis</h4><p>${c.fitHypothesis}</p></div>
+        <div class="detail-section full-width"><h4>Outreach Triggers</h4><ul>${c.triggers.split(';').map(t=>{const txt=t.trim();const isNewTrig=c.newTriggerItems&&c.newTriggerItems.split(';').some(nt=>txt.includes(nt.trim().substring(0,30)));return isNewTrig?`<li class="new-trigger-item">\u2728 ${txt}</li>`:`<li>${txt}</li>`;}).join('')}</ul></div>
+        <div class="detail-section"><h4>Competitive Landscape</h4><p>${c.competitive}</p></div>
+        <div class="detail-section"><h4>Compliance Angle</h4><p>${c.compliance}</p></div>
+        <div class="detail-section full-width"><h4>Suggested Outreach Angle</h4><p>${c.outreachAngle}</p></div>
+      </div>
+    </div></td>`;
+    tb.appendChild(dr);
+  });
+  updateStats(data);
+}
+
+function toggle(id){
+  if(expanded.has(id))expanded.delete(id);else expanded.add(id);
+  applyFilters();
+}
+
+function applyFilters(){
+  const q=document.getElementById('search').value.toLowerCase();
+  const pf=document.getElementById('priorityFilter').value;
+  const sf=document.getElementById('statusFilter').value;
+  const sort=document.getElementById('sortBy').value;
+  let data=COMPANIES.filter(c=>{
+    if(pf&&c.priority!==pf)return false;
+    if(sf==='new'&&!c.isNew)return false;
+    if(sf==='updated'&&!c.isUpdated)return false;
+    if(sf==='new+updated'&&!c.isNew&&!c.isUpdated)return false;
+    if(q){
+      const hay=[c.name,c.industry,c.triggers,c.products,c.fitHypothesis,c.competitive,c.compliance,c.outreachAngle,c.website].join(' ').toLowerCase();
+      return hay.includes(q);
+    }
+    return true;
+  });
+  data.sort((a,b)=>{
+    if(sort==='priority')return(priorityOrder[a.priority]??9)-(priorityOrder[b.priority]??9)||a.name.localeCompare(b.name);
+    if(sort==='name')return a.name.localeCompare(b.name);
+    if(sort==='industry')return a.industry.localeCompare(b.industry)||a.name.localeCompare(b.name);
+    return 0;
+  });
+  renderTable(data);
+}
+
+function updateStats(data){
+  const counts={};
+  let newCount=0,updCount=0;
+  data.forEach(c=>{counts[c.priority]=(counts[c.priority]||0)+1;if(c.isNew)newCount++;if(c.isUpdated)updCount++;});
+  document.getElementById('accountCount').textContent=COMPANIES.length;
+  document.getElementById('stats').innerHTML=
+    `<span>${data.length} of ${COMPANIES.length} accounts</span>`+
+    (newCount?`<span class="badge" style="background:#632CA6;color:#fff">New: ${newCount}</span>`:'')+
+    (updCount?`<span class="badge" style="background:#2563eb;color:#fff">Updated: ${updCount}</span>`:'')+
+    Object.entries(counts).sort((a,b)=>(priorityOrder[a[0]]??9)-(priorityOrder[b[0]]??9))
+    .map(([k,v])=>`<span class="badge badge-${k.toLowerCase().replace(/[- ]/g,'')}">${k}: ${v}</span>`).join('');
+}
+
+let debounce;
+document.getElementById('search').addEventListener('input',()=>{clearTimeout(debounce);debounce=setTimeout(applyFilters,200)});
+document.getElementById('priorityFilter').addEventListener('change',applyFilters);
+document.getElementById('statusFilter').addEventListener('change',applyFilters);
+document.getElementById('sortBy').addEventListener('change',applyFilters);
+applyFilters();
+</script>
+</body>
+</html>
