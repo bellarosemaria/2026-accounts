@@ -58,6 +58,35 @@ tbody td{padding:10px 14px;font-size:13px;border-bottom:1px solid #f0f0f0;vertic
 .product-tags{display:flex;flex-wrap:wrap;gap:4px}
 .product-tag{background:#ede9fe;color:#5b21b6;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:500;white-space:nowrap}
 @media(max-width:1200px){.controls input[type=text]{width:200px}.detail-grid{grid-template-columns:1fr}.contacts-grid{grid-template-columns:1fr}}
+.insights-toggle{background:#fff;padding:14px 32px;border-bottom:1px solid #e4e7ed;display:flex;align-items:center;gap:12px}
+.insights-toggle button{background:linear-gradient(135deg,#632CA6,#7B4FBF);color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;transition:all .2s}
+.insights-toggle button:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(99,44,166,.3)}
+.insights-toggle button.active{background:linear-gradient(135deg,#4a1d80,#632CA6)}
+.insights-toggle .toggle-hint{font-size:12px;color:#9ca3af}
+.insights-panel{display:none;padding:20px 32px;background:linear-gradient(180deg,#faf9ff,#f5f6fa)}
+.insights-panel.visible{display:block;animation:slideDown .3s ease}
+.insights-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px}
+.insight-card{background:#fff;border-radius:10px;padding:16px 18px;border:1px solid #e8e5f0;box-shadow:0 1px 4px rgba(0,0,0,.04);transition:all .15s}
+.insight-card:hover{box-shadow:0 4px 12px rgba(99,44,166,.1);transform:translateY(-2px)}
+.insight-card .ic-header{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.insight-card .ic-icon{font-size:20px}
+.insight-card .ic-title{font-size:13px;font-weight:700;color:#23233e}
+.insight-card .ic-subtitle{font-size:11px;color:#6b7280;margin-top:1px}
+.insight-card .ic-body{font-size:12px;line-height:1.6;color:#374151}
+.insight-card .ic-body strong{color:#632CA6}
+.insight-card .ic-tag{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;margin-top:8px}
+.tag-funding{background:#dcfce7;color:#166534}.tag-hire{background:#dbeafe;color:#1e40af}.tag-launch{background:#fce7f3;color:#9d174d}.tag-ma{background:#fef3c7;color:#92400e}.tag-risk{background:#fee2e2;color:#991b1b}.tag-expansion{background:#ede9fe;color:#5b21b6}
+.hot-accounts{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.hot-card{background:#fff;border-radius:10px;padding:14px 16px;border-left:4px solid #632CA6;cursor:pointer;transition:all .15s;border-right:1px solid #e8e5f0;border-top:1px solid #e8e5f0;border-bottom:1px solid #e8e5f0}
+.hot-card:hover{box-shadow:0 4px 12px rgba(99,44,166,.12);transform:translateY(-2px)}
+.hot-card .hc-name{font-weight:700;font-size:14px;color:#23233e}
+.hot-card .hc-industry{font-size:11px;color:#6b7280;margin-top:2px}
+.hot-card .hc-trigger{font-size:12px;color:#374151;margin-top:8px;line-height:1.5}
+.hot-card .hc-products{margin-top:8px;display:flex;flex-wrap:wrap;gap:4px}
+.hot-card .hc-action{margin-top:10px;font-size:11px;font-weight:700;color:#632CA6}
+.section-header{font-size:16px;font-weight:700;color:#23233e;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.section-header .sh-badge{font-size:11px;background:#632CA6;color:#fff;padding:2px 8px;border-radius:10px}
+@media(max-width:1200px){.insights-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -88,6 +117,11 @@ tbody td{padding:10px 14px;font-size:13px;border-bottom:1px solid #f0f0f0;vertic
   </select>
   <div class="stats" id="stats"></div>
 </div>
+<div class="insights-toggle">
+  <button id="insightsBtn" onclick="toggleInsights()">Key Insights</button>
+  <span class="toggle-hint">Hottest signals to act on this week</span>
+</div>
+<div class="insights-panel" id="insightsPanel"></div>
 <div class="container">
   <table><thead><tr>
     <th style="width:30px"></th>
@@ -197,6 +231,111 @@ document.getElementById('search').addEventListener('input',()=>{clearTimeout(deb
 document.getElementById('priorityFilter').addEventListener('change',applyFilters);
 document.getElementById('statusFilter').addEventListener('change',applyFilters);
 document.getElementById('sortBy').addEventListener('change',applyFilters);
+function toggleInsights(){
+  const panel=document.getElementById('insightsPanel');
+  const btn=document.getElementById('insightsBtn');
+  if(panel.classList.contains('visible')){
+    panel.classList.remove('visible');
+    btn.classList.remove('active');
+  }else{
+    panel.classList.add('visible');
+    btn.classList.add('active');
+    renderInsights();
+  }
+}
+
+function renderInsights(){
+  const panel=document.getElementById('insightsPanel');
+  const fundingKeywords=['series','raised','funding','$','investment','ipo','financing','credit facility','offering'];
+  const hireKeywords=['hired','appointed','promoted','named','cto','cio','cfo','ceo','chief','vp of','head of'];
+  const launchKeywords=['launched','released','unveiled','debuted','announced','partnership','acquired','acquisition'];
+
+  // Score companies by recency and signal strength
+  const scored=COMPANIES.map(c=>{
+    let score=0;
+    const t=c.triggers.toLowerCase();
+    const hasAprUpdate=t.includes('[apr 2026 update]');
+    if(hasAprUpdate)score+=20;
+    if(c.isNew)score+=15;
+    if(c.priority==='High')score+=10;
+    if(c.priority==='Medium-High')score+=7;
+    // Funding signals
+    const fundingMatch=t.match(/\$[\d,.]+[mb]/gi);
+    if(fundingMatch){
+      const amounts=fundingMatch.map(m=>parseFloat(m.replace(/[^0-9.]/g,'')));
+      score+=Math.min(amounts.reduce((a,b)=>a+b,0)/10,20);
+    }
+    // Recency signals (2026 mentions)
+    const mar26=(t.match(/mar(ch)?\s*2026/gi)||[]).length;
+    const apr26=(t.match(/apr(il)?\s*2026/gi)||[]).length;
+    const feb26=(t.match(/feb(ruary)?\s*2026/gi)||[]).length;
+    const jan26=(t.match(/jan(uary)?\s*2026/gi)||[]).length;
+    score+=(apr26*8)+(mar26*6)+(feb26*4)+(jan26*2);
+    // Executive hires
+    if(hireKeywords.some(k=>t.includes(k)))score+=5;
+    // Product launches
+    if(launchKeywords.some(k=>t.includes(k)))score+=3;
+    return{...c,score};
+  }).sort((a,b)=>b.score-a.score);
+
+  const top12=scored.slice(0,12);
+
+  // Categorize key signals
+  const signals={funding:[],hires:[],launches:[],ma:[],expansion:[]};
+  COMPANIES.forEach(c=>{
+    const t=c.triggers;
+    if(!t.includes('[APR 2026 UPDATE]'))return;
+    const update=t.split('[APR 2026 UPDATE]')[1]||'';
+    const items=update.split(';').map(s=>s.trim()).filter(Boolean);
+    items.forEach(item=>{
+      const il=item.toLowerCase();
+      if(il.match(/\$[\d,.]+[mb].*(?:raised|series|round|funding|financing|offering|investment|closed)/i)||il.match(/(?:raised|series|round|funding|financing|offering|investment|closed).*\$[\d,.]+[mb]/i))
+        signals.funding.push({company:c.name,text:item,priority:c.priority});
+      else if(hireKeywords.some(k=>il.includes(k)))
+        signals.hires.push({company:c.name,text:item,priority:c.priority});
+      else if(il.includes('acqui')||il.includes('merger'))
+        signals.ma.push({company:c.name,text:item,priority:c.priority});
+      else if(il.includes('launch')||il.includes('released')||il.includes('unveiled'))
+        signals.launches.push({company:c.name,text:item,priority:c.priority});
+      else if(il.includes('expan')||il.includes('partner')||il.includes('opened')||il.includes('europe')||il.includes('international'))
+        signals.expansion.push({company:c.name,text:item,priority:c.priority});
+    });
+  });
+
+  const signalCards=[
+    {icon:'💰',title:'Funding & Capital',tag:'tag-funding',tagText:'FUNDING',items:signals.funding.slice(0,5)},
+    {icon:'👤',title:'Executive Moves',tag:'tag-hire',tagText:'HIRE',items:signals.hires.slice(0,5)},
+    {icon:'🚀',title:'Product Launches',tag:'tag-launch',tagText:'LAUNCH',items:signals.launches.slice(0,5)},
+    {icon:'🤝',title:'M&A Activity',tag:'tag-ma',tagText:'M&A',items:signals.ma.slice(0,5)},
+    {icon:'🌐',title:'Expansion Signals',tag:'tag-expansion',tagText:'GROWTH',items:signals.expansion.slice(0,5)},
+  ].filter(s=>s.items.length>0);
+
+  panel.innerHTML=`
+    <div class="section-header">Attack Now <span class="sh-badge">Top 12 by Signal Strength</span></div>
+    <div class="hot-accounts">
+      ${top12.map(c=>{
+        const topTrigger=c.triggers.includes('[APR 2026 UPDATE]')?c.triggers.split('[APR 2026 UPDATE]')[1].split(';')[0].trim():c.triggers.split(';')[0].trim();
+        return`<div class="hot-card" onclick="document.getElementById('search').value='${c.name.replace(/'/g,"\\'")}';applyFilters();toggleInsights();">
+          <div class="hc-name">${c.name} <span class="priority-cell p-${c.priority.replace(/\s/g,'-')}" style="font-size:10px;padding:2px 6px;min-width:auto">${c.priority}</span></div>
+          <div class="hc-industry">${c.industry}</div>
+          <div class="hc-trigger">${topTrigger.substring(0,160)}${topTrigger.length>160?'...':''}</div>
+          <div class="hc-products">${c.products.split(',').slice(0,4).map(p=>'<span class="product-tag">'+p.trim()+'</span>').join('')}</div>
+          <div class="hc-action">View full brief →</div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div style="margin-top:24px">
+      <div class="section-header">Signal Feed <span class="sh-badge">${signalCards.reduce((a,s)=>a+s.items.length,0)} signals this cycle</span></div>
+      <div class="insights-grid">
+        ${signalCards.map(s=>`<div class="insight-card">
+          <div class="ic-header"><span class="ic-icon">${s.icon}</span><div><div class="ic-title">${s.title}</div><div class="ic-subtitle">${s.items.length} signal${s.items.length>1?'s':''}</div></div></div>
+          <div class="ic-body">${s.items.map(i=>`<div style="margin-bottom:6px"><strong>${i.company}:</strong> ${i.text.substring(0,120)}${i.text.length>120?'...':''}</div>`).join('')}</div>
+          <span class="ic-tag ${s.tag}">${s.tagText}</span>
+        </div>`).join('')}
+      </div>
+    </div>`;
+}
+
 applyFilters();
 </script>
 </body>
